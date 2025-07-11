@@ -1,8 +1,7 @@
 import streamlit as st
 import pandas as pd
 import joblib
-import matplotlib.pyplot as plt
-import seaborn as sns
+import os
 
 # Load model, scaler, dan fitur
 model = joblib.load('random_forest_model.pkl')
@@ -19,6 +18,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Load atau inisialisasi history
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
 # --- SIDEBAR INFO ---
 with st.sidebar:
     st.header("📘️ Panduan Penggunaan")
@@ -27,9 +30,17 @@ with st.sidebar:
     - Masukkan data kandidat secara lengkap
     - Centang validasi manual sebelum prediksi
     - Unduh hasil jika dibutuhkan
+    - Gunakan tombol simpan untuk menyimpan hasil
     """)
     st.divider()
     mode = st.radio("🔧 Mode Input", ["Input Manual", "Upload CSV"])
+    if st.button("🕘 Lihat Riwayat Prediksi"):
+        if st.session_state.history:
+            st.subheader("🗂️ Riwayat Prediksi")
+            history_df = pd.DataFrame(st.session_state.history)
+            st.dataframe(history_df)
+        else:
+            st.info("Belum ada riwayat prediksi yang tersimpan.")
 
 # ======================== INPUT MANUAL ========================
 if mode == "Input Manual":
@@ -46,21 +57,15 @@ if mode == "Input Manual":
     col1, col2, col3 = st.columns([1, 1, 1])
 
     with col1:
-        recruitment_strategy = st.selectbox(
-            "📌 Strategi Rekrutmen", ["1", "2", "3"],
-            help="1=LinkedIn, 2=Job Fair, 3=Referensi"
-        )
-        education_level = st.selectbox(
-            "🎓 Tingkat Pendidikan", ["1", "2", "3", "4"],
-            help="1=SMA, 2=D3, 3=S1, 4=S2/S3"
-        )
+        recruitment_strategy = st.selectbox("📌 Strategi Rekrutmen", ["1", "2", "3"])
+        education_level = st.selectbox("🎓 Tingkat Pendidikan", ["1", "2", "3", "4"])
 
     with col2:
-        skill_score = st.slider("🛠️ Skor Keterampilan", 0.0, 10.0, 5.0, help="Skill teknikal")
-        interview_score = st.slider("🗣️ Skor Interview", 0.0, 10.0, 5.0, help="Wawancara")
+        skill_score = st.slider("🛠️ Skor Keterampilan", 0.0, 10.0, 5.0)
+        interview_score = st.slider("🗣️ Skor Interview", 0.0, 10.0, 5.0)
 
     with col3:
-        personality_score = st.slider("🤝 Skor Kepribadian", 0.0, 10.0, 5.0, help="Softskill & attitude")
+        personality_score = st.slider("🤝 Skor Kepribadian", 0.0, 10.0, 5.0)
         experience_years = st.slider("📅 Pengalaman (tahun)", 0, 20, 2)
 
     # One-hot encode
@@ -120,35 +125,22 @@ if 'input_df' in locals():
             if st.button("🚀 Jalankan Prediksi"):
                 if is_valid:
                     result = predictions[0]
-                    if result == 1:
-                        st.markdown("""
-                        <div style='background-color:#DFF2BF;padding:20px;border-radius:10px'>
-                            <h3 style='color:#4F8A10'>✅ Kandidat kemungkinan <u>DITERIMA</u></h3>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    else:
-                        st.markdown("""
-                        <div style='background-color:#FFBABA;padding:20px;border-radius:10px'>
-                            <h3 style='color:#D8000C'>❌ Kandidat kemungkinan <u>TIDAK DITERIMA</u></h3>
+                    prediction_text = "DITERIMA" if result == 1 else "TIDAK DITERIMA"
+                    color = "#DFF2BF" if result == 1 else "#FFBABA"
+                    font_color = "#4F8A10" if result == 1 else "#D8000C"
+                    st.markdown(f"""
+                        <div style='background-color:{color};padding:20px;border-radius:10px'>
+                            <h3 style='color:{font_color}'>✅ Kandidat kemungkinan <u>{prediction_text}</u></h3>
                         </div>
                         """, unsafe_allow_html=True)
 
-                    # Visualisasi skor kandidat
-                    st.markdown("### 📈 Visualisasi Skor Kandidat")
-                    score_data = {
-                        'Skill': skill_score,
-                        'Interview': interview_score,
-                        'Personality': personality_score,
-                        'Experience': experience_years
-                    }
-
-                    fig, ax = plt.subplots(figsize=(6, 4))
-                    ax.bar(score_data.keys(), score_data.values(), color=["#3498db", "#2ecc71", "#9b59b6", "#f39c12"])
-                    ax.set_ylim(0, max(score_data.values()) + 2)
-                    ax.set_ylabel("Skor")
-                    fig.tight_layout()
-                    st.pyplot(fig)
-
+                    # Tombol simpan ke riwayat
+                    if st.button("💾 Simpan ke Riwayat"):
+                        st.session_state.history.append({
+                            **input_data,
+                            "Prediksi": prediction_text
+                        })
+                        st.success("Hasil prediksi disimpan ke riwayat.")
                 else:
                     st.warning("⚠️ Silakan centang validasi sebelum melanjutkan.")
 
@@ -159,23 +151,6 @@ if 'input_df' in locals():
 
             st.download_button("📥 Download Hasil Prediksi", data=input_df.to_csv(index=False),
                                file_name="hasil_prediksi.csv", mime="text/csv")
-
-            # Statistik
-            st.markdown("### 📊 Statistik Hasil Prediksi")
-            accepted = input_df['Prediksi'].value_counts().get("DITERIMA", 0)
-            rejected = input_df['Prediksi'].value_counts().get("TIDAK DITERIMA", 0)
-
-            col_a, col_b = st.columns(2)
-            with col_a:
-                st.metric("✅ Diterima", accepted)
-            with col_b:
-                st.metric("❌ Tidak Diterima", rejected)
-
-            fig, ax = plt.subplots(figsize=(6, 4))
-            sns.countplot(data=input_df, x='Prediksi', palette=["#27ae60", "#e74c3c"], ax=ax)
-            ax.set_title("Distribusi Hasil Prediksi")
-            fig.tight_layout()
-            st.pyplot(fig)
 
     except Exception as e:
         st.error(f"❌ Terjadi kesalahan saat memproses data: {e}")
