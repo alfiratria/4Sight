@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import joblib
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # Load model, scaler, dan fitur
 model = joblib.load('random_forest_model.pkl')
@@ -19,11 +21,11 @@ st.markdown("""
 
 # --- SIDEBAR INFO ---
 with st.sidebar:
-    st.header("📘 Panduan Penggunaan")
+    st.header("📘️ Panduan Penggunaan")
     st.markdown("""
     - Pilih **mode input** data: manual atau CSV
     - Masukkan data kandidat secara lengkap
-    - Klik tombol **Prediksi** untuk melihat hasil
+    - Centang validasi manual sebelum prediksi
     - Unduh hasil jika dibutuhkan
     """)
     st.divider()
@@ -35,9 +37,9 @@ if mode == "Input Manual":
 
     with st.expander("ℹ️ Penjelasan Setiap Variabel"):
         st.markdown("""
-        - **Strategi Rekrutmen**: Metode menemukan kandidat (1=LinkedIn, 2=Job Fair, 3=Referensi)
+        - **Strategi Rekrutmen**: 1=LinkedIn, 2=Job Fair, 3=Referensi
         - **Tingkat Pendidikan**: 1=SMA, 2=D3, 3=S1, 4=S2/S3
-        - **Skor**: Diisi dengan nilai 0–10 untuk Keterampilan, Interview & Kepribadian
+        - **Skor**: Diisi nilai 0–10 untuk Skill, Interview, Personality
         - **Pengalaman**: Tahun pengalaman kerja
         """)
 
@@ -80,7 +82,7 @@ if mode == "Input Manual":
 # ======================== CSV MODE ========================
 else:
     st.subheader("📂 Upload CSV Data Kandidat")
-    uploaded_file = st.file_uploader("📤 Upload CSV berisi data kandidat", type=["csv"])
+    uploaded_file = st.file_uploader("📄 Upload CSV berisi data kandidat", type=["csv"])
 
     if uploaded_file is not None:
         raw_df = pd.read_csv(uploaded_file)
@@ -89,7 +91,6 @@ else:
 
         input_df = raw_df.copy()
 
-        # Pastikan semua kolom one-hot tersedia
         for level in ["1", "2", "3", "4"]:
             if f'EducationLevel_{level}' not in input_df.columns:
                 input_df[f'EducationLevel_{level}'] = 0
@@ -114,20 +115,42 @@ if 'input_df' in locals():
         predictions = model.predict(input_scaled)
 
         if mode == "Input Manual":
+            is_valid = st.checkbox("Saya sudah memastikan data di atas benar dan siap diprediksi.")
+
             if st.button("🚀 Jalankan Prediksi"):
-                result = predictions[0]
-                if result == 1:
-                    st.markdown("""
-                    <div style='background-color:#DFF2BF;padding:20px;border-radius:10px'>
-                        <h3 style='color:#4F8A10'>✅ Kandidat kemungkinan <u>DITERIMA</u></h3>
-                    </div>
-                    """, unsafe_allow_html=True)
+                if is_valid:
+                    result = predictions[0]
+                    if result == 1:
+                        st.markdown("""
+                        <div style='background-color:#DFF2BF;padding:20px;border-radius:10px'>
+                            <h3 style='color:#4F8A10'>✅ Kandidat kemungkinan <u>DITERIMA</u></h3>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    else:
+                        st.markdown("""
+                        <div style='background-color:#FFBABA;padding:20px;border-radius:10px'>
+                            <h3 style='color:#D8000C'>❌ Kandidat kemungkinan <u>TIDAK DITERIMA</u></h3>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    # Visualisasi skor kandidat
+                    st.markdown("### 📈 Visualisasi Skor Kandidat")
+                    score_data = {
+                        'Skill': skill_score,
+                        'Interview': interview_score,
+                        'Personality': personality_score,
+                        'Experience': experience_years
+                    }
+
+                    fig, ax = plt.subplots()
+                    ax.bar(score_data.keys(), score_data.values(), color=["#3498db", "#2ecc71", "#9b59b6", "#f39c12"])
+                    ax.set_ylim(0, max(score_data.values()) + 2)
+                    ax.set_ylabel("Skor")
+                    st.pyplot(fig)
+
                 else:
-                    st.markdown("""
-                    <div style='background-color:#FFBABA;padding:20px;border-radius:10px'>
-                        <h3 style='color:#D8000C'>❌ Kandidat kemungkinan <u>TIDAK DITERIMA</u></h3>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.warning("⚠️ Silakan centang validasi sebelum melanjutkan.")
+
         else:
             input_df['Prediksi'] = ["DITERIMA" if p == 1 else "TIDAK DITERIMA" for p in predictions]
             st.success("✅ Hasil prediksi siap ditinjau:")
@@ -135,6 +158,22 @@ if 'input_df' in locals():
 
             st.download_button("📥 Download Hasil Prediksi", data=input_df.to_csv(index=False),
                                file_name="hasil_prediksi.csv", mime="text/csv")
+
+            # Statistik
+            st.markdown("### 📊 Statistik Hasil Prediksi")
+            accepted = input_df['Prediksi'].value_counts().get("DITERIMA", 0)
+            rejected = input_df['Prediksi'].value_counts().get("TIDAK DITERIMA", 0)
+
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.metric("✅ Diterima", accepted)
+            with col_b:
+                st.metric("❌ Tidak Diterima", rejected)
+
+            fig, ax = plt.subplots()
+            sns.countplot(data=input_df, x='Prediksi', palette=["#27ae60", "#e74c3c"], ax=ax)
+            ax.set_title("Distribusi Hasil Prediksi")
+            st.pyplot(fig)
 
     except Exception as e:
         st.error(f"❌ Terjadi kesalahan saat memproses data: {e}")
