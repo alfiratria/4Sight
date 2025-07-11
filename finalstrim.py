@@ -55,11 +55,14 @@ if mode == "Input Manual":
 
     with st.expander("ℹ️ Penjelasan Setiap Variabel"):
         st.markdown("""
+        - **Nama Kandidat**: Nama lengkap kandidat
         - **Strategi Rekrutmen**: 1=LinkedIn, 2=Job Fair, 3=Referensi
         - **Tingkat Pendidikan**: 1=SMA, 2=D3, 3=S1, 4=S2/S3
         - **Skor**: Diisi nilai 0–10 untuk Skill, Interview, Personality
         - **Pengalaman**: Tahun pengalaman kerja
         """)
+
+    candidate_name = st.text_input("🧑‍💼 Nama Kandidat")
 
     col1, col2, col3 = st.columns([1, 1, 1])
 
@@ -77,6 +80,7 @@ if mode == "Input Manual":
 
     # One-hot encode input
     input_data = {
+        'CandidateName': candidate_name,
         'SkillScore': skill_score,
         'ExperienceYears': experience_years,
         'InterviewScore': interview_score,
