@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 import os
+from datetime import datetime
 
 # Load model, scaler, dan fitur
 model = joblib.load('random_forest_model.pkl')
@@ -13,18 +14,32 @@ st.set_page_config(page_title="Prediksi Hiring Kandidat", page_icon="💼", layo
 # --- KONFIGURASI FILE RIWAYAT ---
 HISTORY_FILE = 'riwayat_prediksi.csv'
 
-# Load riwayat dari file (jika ada)
-if 'history' not in st.session_state:
+# Fungsi untuk memuat history
+def load_history():
     if os.path.exists(HISTORY_FILE):
-        st.session_state.history = pd.read_csv(HISTORY_FILE).to_dict(orient='records')
-    else:
-        st.session_state.history = []
+        try:
+            return pd.read_csv(HISTORY_FILE).to_dict('records')
+        except Exception as e:
+            st.error(f"Error loading history: {e}")
+            return []
+    return []
+
+# Fungsi untuk menyimpan history
+def save_history():
+    try:
+        history_df = pd.DataFrame(st.session_state.history)
+        # Buat direktori jika belum ada
+        os.makedirs(os.path.dirname(HISTORY_FILE) or '.', exist_ok=True)
+        history_df.to_csv(HISTORY_FILE, index=False)
+    except Exception as e:
+        st.error(f"Gagal menyimpan riwayat: {e}")
+
+# Inisialisasi session state
+if 'history' not in st.session_state:
+    st.session_state.history = load_history()
 
 if 'show_history' not in st.session_state:
     st.session_state.show_history = False
-
-def save_history_to_file():
-    pd.DataFrame(st.session_state.history).to_csv(HISTORY_FILE, index=False)
 
 # --- HEADER ---
 st.markdown("""
@@ -47,7 +62,7 @@ with st.sidebar:
     st.divider()
     mode = st.radio("🔧 Mode Input", ["Input Manual", "Upload CSV"])
     if st.button("🕘 Lihat Riwayat Prediksi"):
-        st.session_state.show_history = True
+        st.session_state.show_history = not st.session_state.show_history
 
 # ======================== INPUT MANUAL ========================
 if mode == "Input Manual":
@@ -62,7 +77,7 @@ if mode == "Input Manual":
         - **Pengalaman**: Tahun pengalaman kerja
         """)
 
-    candidate_name = st.text_input("🧑‍💼 Nama Kandidat")
+    candidate_name = st.text_input("🧑‍💼 Nama Kandidat", "Nama Kandidat")
 
     col1, col2, col3 = st.columns([1, 1, 1])
 
@@ -85,6 +100,7 @@ if mode == "Input Manual":
         'ExperienceYears': experience_years,
         'InterviewScore': interview_score,
         'PersonalityScore': personality_score,
+        'Timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
     for level in ["1", "2", "3", "4"]:
@@ -101,23 +117,35 @@ else:
     uploaded_file = st.file_uploader("📄 Upload CSV berisi data kandidat", type=["csv"])
 
     if uploaded_file is not None:
-        raw_df = pd.read_csv(uploaded_file)
-        st.success("✅ File berhasil dibaca. Menampilkan beberapa data pertama:")
-        st.dataframe(raw_df.head())
+        try:
+            raw_df = pd.read_csv(uploaded_file)
+            st.success("✅ File berhasil dibaca. Menampilkan beberapa data pertama:")
+            st.dataframe(raw_df.head())
 
-        input_df = raw_df.copy()
+            input_df = raw_df.copy()
 
-        for level in ["1", "2", "3", "4"]:
-            if f'EducationLevel_{level}' not in input_df.columns:
-                input_df[f'EducationLevel_{level}'] = 0
-        for strategy in ["1", "2", "3"]:
-            if f'RecruitmentStrategy_{strategy}' not in input_df.columns:
-                input_df[f'RecruitmentStrategy_{strategy}'] = 0
-        for col in feature_names:
-            if col not in input_df.columns:
-                input_df[col] = 0
+            # Pastikan semua kolom yang dibutuhkan ada
+            for level in ["1", "2", "3", "4"]:
+                if f'EducationLevel_{level}' not in input_df.columns:
+                    input_df[f'EducationLevel_{level}'] = 0
+            
+            for strategy in ["1", "2", "3"]:
+                if f'RecruitmentStrategy_{strategy}' not in input_df.columns:
+                    input_df[f'RecruitmentStrategy_{strategy}'] = 0
+            
+            # Tambahkan timestamp
+            input_df['Timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        input_df = input_df[feature_names]
+            # Pastikan semua feature ada
+            for col in feature_names:
+                if col not in input_df.columns and col != 'Timestamp':
+                    input_df[col] = 0
+
+            input_df = input_df[feature_names + ['Timestamp']]
+
+        except Exception as e:
+            st.error(f"❌ Error processing CSV file: {e}")
+            st.stop()
 
 # ======================== PREDIKSI ========================
 if 'input_df' in locals():
@@ -125,6 +153,7 @@ if 'input_df' in locals():
     st.subheader("🔍 Proses Prediksi")
 
     try:
+        # Pastikan urutan kolom sesuai dengan scaler
         input_df = input_df[scaler.feature_names_in_]
         input_scaled = pd.DataFrame(scaler.transform(input_df), columns=input_df.columns)
         predictions = model.predict(input_scaled)
@@ -138,41 +167,72 @@ if 'input_df' in locals():
                     prediction_text = "DITERIMA" if result == 1 else "TIDAK DITERIMA"
                     color = "#DFF2BF" if result == 1 else "#FFBABA"
                     font_color = "#4F8A10" if result == 1 else "#D8000C"
+                    
                     st.markdown(f"""
                         <div style='background-color:{color};padding:20px;border-radius:10px'>
                             <h3 style='color:{font_color}'>✅ Kandidat kemungkinan <u>{prediction_text}</u></h3>
                         </div>
                     """, unsafe_allow_html=True)
 
-                    if st.button("💾 Simpan ke Riwayat"):
-                        st.session_state.history.append({
-                            **input_data,
-                            "Prediksi": prediction_text
-                        })
-                        save_history_to_file()
-                        st.success("✅ Hasil prediksi disimpan ke riwayat dan file.")
+                    # Simpan ke history
+                    input_data['Prediction'] = prediction_text
+                    st.session_state.history.append(input_data)
+                    save_history()
+                    st.success("✅ Hasil prediksi disimpan ke riwayat.")
+
                 else:
                     st.warning("⚠️ Silakan centang validasi sebelum melanjutkan.")
 
-        else:
-            input_df['Prediksi'] = ["DITERIMA" if p == 1 else "TIDAK DITERIMA" for p in predictions]
+        else:  # Mode CSV
+            input_df['Prediction'] = ["DITERIMA" if p == 1 else "TIDAK DITERIMA" for p in predictions]
             st.success("✅ Hasil prediksi siap ditinjau:")
             st.dataframe(input_df)
 
-            st.download_button("📥 Download Hasil Prediksi", data=input_df.to_csv(index=False),
-                               file_name="hasil_prediksi.csv", mime="text/csv")
+            # Tombol download
+            st.download_button(
+                label="📥 Download Hasil Prediksi",
+                data=input_df.to_csv(index=False),
+                file_name="hasil_prediksi.csv",
+                mime="text/csv"
+            )
+
+            # Tombol simpan semua ke history
+            if st.button("💾 Simpan Semua ke Riwayat"):
+                records = input_df.to_dict('records')
+                st.session_state.history.extend(records)
+                save_history()
+                st.success(f"✅ {len(records)} prediksi disimpan ke riwayat.")
 
     except Exception as e:
         st.error(f"❌ Terjadi kesalahan saat memproses data: {e}")
 
 # ======================== TAMPILKAN RIWAYAT ========================
-if st.session_state.get("show_history", False):
+if st.session_state.show_history:
     st.markdown("---")
-    st.subheader("🗂️ Riwayat Prediksi Kandidat yang Disimpan")
+    st.subheader("🗂️ Riwayat Prediksi Kandidat")
+    
     if st.session_state.history:
         history_df = pd.DataFrame(st.session_state.history)
-        st.dataframe(history_df)
-        st.download_button("📥 Download Riwayat", data=history_df.to_csv(index=False),
-                           file_name="riwayat_prediksi.csv", mime="text/csv")
+        
+        # Tampilkan kolom yang relevan saja
+        display_cols = ['Timestamp', 'CandidateName', 'Prediction', 'SkillScore', 
+                       'ExperienceYears', 'InterviewScore', 'PersonalityScore']
+        display_cols = [col for col in display_cols if col in history_df.columns]
+        
+        st.dataframe(history_df[display_cols].sort_values('Timestamp', ascending=False))
+        
+        # Tombol download
+        st.download_button(
+            label="📥 Download Riwayat Lengkap",
+            data=history_df.to_csv(index=False),
+            file_name="riwayat_prediksi_lengkap.csv",
+            mime="text/csv"
+        )
+        
+        # Tombol hapus riwayat
+        if st.button("🗑️ Hapus Semua Riwayat"):
+            st.session_state.history = []
+            save_history()
+            st.success("Riwayat telah dihapus")
     else:
-        st.info("Belum ada riwayat yang disimpan.")
+        st.info("Belum ada riwayat prediksi yang disimpan.")
