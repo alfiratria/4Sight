@@ -21,6 +21,8 @@ st.markdown("""
 # Load atau inisialisasi history
 if 'history' not in st.session_state:
     st.session_state.history = []
+if 'show_history' not in st.session_state:
+    st.session_state.show_history = False
 
 # --- SIDEBAR INFO ---
 with st.sidebar:
@@ -35,12 +37,7 @@ with st.sidebar:
     st.divider()
     mode = st.radio("🔧 Mode Input", ["Input Manual", "Upload CSV"])
     if st.button("🕘 Lihat Riwayat Prediksi"):
-        if st.session_state.history:
-            st.subheader("🗂️ Riwayat Prediksi")
-            history_df = pd.DataFrame(st.session_state.history)
-            st.dataframe(history_df)
-        else:
-            st.info("Belum ada riwayat prediksi yang tersimpan.")
+        st.session_state.show_history = True
 
 # ======================== INPUT MANUAL ========================
 if mode == "Input Manual":
@@ -154,3 +151,14 @@ if 'input_df' in locals():
 
     except Exception as e:
         st.error(f"❌ Terjadi kesalahan saat memproses data: {e}")
+
+# ======================== RIWAYAT ========================
+if st.session_state.get("show_history", False):
+    st.markdown("---")
+    st.subheader("🗂️ Riwayat Prediksi Kandidat yang Disimpan")
+    if st.session_state.history:
+        history_df = pd.DataFrame(st.session_state.history)
+        st.dataframe(history_df)
+        st.download_button("📥 Download Riwayat", data=history_df.to_csv(index=False), file_name="riwayat_prediksi.csv", mime="text/csv")
+    else:
+        st.info("Belum ada riwayat yang disimpan.")
