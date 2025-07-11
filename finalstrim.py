@@ -142,10 +142,11 @@ if 'input_df' in locals():
                         'Experience': experience_years
                     }
 
-                    fig, ax = plt.subplots()
+                    fig, ax = plt.subplots(figsize=(6, 4))
                     ax.bar(score_data.keys(), score_data.values(), color=["#3498db", "#2ecc71", "#9b59b6", "#f39c12"])
                     ax.set_ylim(0, max(score_data.values()) + 2)
                     ax.set_ylabel("Skor")
+                    fig.tight_layout()
                     st.pyplot(fig)
 
                 else:
@@ -170,9 +171,10 @@ if 'input_df' in locals():
             with col_b:
                 st.metric("❌ Tidak Diterima", rejected)
 
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(figsize=(6, 4))
             sns.countplot(data=input_df, x='Prediksi', palette=["#27ae60", "#e74c3c"], ax=ax)
             ax.set_title("Distribusi Hasil Prediksi")
+            fig.tight_layout()
             st.pyplot(fig)
 
     except Exception as e:
