@@ -51,7 +51,7 @@ else:
 
         input_df = raw_df.copy()
 
-        # Pastikan semua kolom one-hot ada
+        # Tambahkan one-hot jika belum ada
         for level in ["1", "2", "3", "4"]:
             if f'EducationLevel_{level}' not in input_df.columns:
                 input_df[f'EducationLevel_{level}'] = 0
@@ -66,22 +66,28 @@ else:
 
         input_df = input_df[feature_names]
 
-# Proses prediksi jika data sudah siap
+# Proses prediksi jika data tersedia
 if 'input_df' in locals():
-    input_df_scaled = pd.DataFrame(scaler.transform(input_df), columns=input_df.columns)
+    try:
+        # Pastikan urutan & nama kolom sesuai saat scaler dilatih
+        input_df = input_df[scaler.feature_names_in_]
+        input_df_scaled = pd.DataFrame(scaler.transform(input_df), columns=input_df.columns)
 
-    st.subheader("📊 Hasil Prediksi")
-    predictions = model.predict(input_df_scaled)
+        st.subheader("📊 Hasil Prediksi")
+        predictions = model.predict(input_df_scaled)
 
-    if mode == "Input Manual":
-        if st.button("🔍 Prediksi Sekarang"):
-            if predictions[0] == 1:
-                st.success("✅ Kandidat kemungkinan **DITERIMA**")
-            else:
-                st.error("❌ Kandidat kemungkinan **TIDAK DITERIMA**")
-    else:
-        input_df['Prediksi'] = ["DITERIMA" if p == 1 else "TIDAK DITERIMA" for p in predictions]
-        st.write("📋 Tabel Hasil Prediksi:")
-        st.dataframe(input_df)
+        if mode == "Input Manual":
+            if st.button("🔍 Prediksi Sekarang"):
+                if predictions[0] == 1:
+                    st.success("✅ Kandidat kemungkinan **DITERIMA**")
+                else:
+                    st.error("❌ Kandidat kemungkinan **TIDAK DITERIMA**")
+        else:
+            input_df['Prediksi'] = ["DITERIMA" if p == 1 else "TIDAK DITERIMA" for p in predictions]
+            st.write("📋 Tabel Hasil Prediksi:")
+            st.dataframe(input_df)
 
-        st.download_button("📥 Download Hasil Prediksi", data=input_df.to_csv(index=False), file_name="hasil_prediksi.csv", mime="text/csv")
+            st.download_button("📥 Download Hasil Prediksi", data=input_df.to_csv(index=False), file_name="hasil_prediksi.csv", mime="text/csv")
+
+    except Exception as e:
+        st.error(f"❌ Terjadi kesalahan saat memproses data: {e}")
