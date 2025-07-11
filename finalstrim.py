@@ -10,6 +10,22 @@ feature_names = joblib.load('feature_names.pkl')
 
 st.set_page_config(page_title="Prediksi Hiring Kandidat", page_icon="💼", layout="wide")
 
+# --- KONFIGURASI FILE RIWAYAT ---
+HISTORY_FILE = 'riwayat_prediksi.csv'
+
+# Load riwayat dari file (jika ada)
+if 'history' not in st.session_state:
+    if os.path.exists(HISTORY_FILE):
+        st.session_state.history = pd.read_csv(HISTORY_FILE).to_dict(orient='records')
+    else:
+        st.session_state.history = []
+
+if 'show_history' not in st.session_state:
+    st.session_state.show_history = False
+
+def save_history_to_file():
+    pd.DataFrame(st.session_state.history).to_csv(HISTORY_FILE, index=False)
+
 # --- HEADER ---
 st.markdown("""
 <div style='text-align: center; padding: 10px 0'>
@@ -18,13 +34,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Load atau inisialisasi history
-if 'history' not in st.session_state:
-    st.session_state.history = []
-if 'show_history' not in st.session_state:
-    st.session_state.show_history = False
-
-# --- SIDEBAR INFO ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.header("📘️ Panduan Penggunaan")
     st.markdown("""
@@ -65,7 +75,7 @@ if mode == "Input Manual":
         personality_score = st.slider("🤝 Skor Kepribadian", 0.0, 10.0, 5.0)
         experience_years = st.slider("📅 Pengalaman (tahun)", 0, 20, 2)
 
-    # One-hot encode
+    # One-hot encode input
     input_data = {
         'SkillScore': skill_score,
         'ExperienceYears': experience_years,
@@ -113,7 +123,6 @@ if 'input_df' in locals():
     try:
         input_df = input_df[scaler.feature_names_in_]
         input_scaled = pd.DataFrame(scaler.transform(input_df), columns=input_df.columns)
-
         predictions = model.predict(input_scaled)
 
         if mode == "Input Manual":
@@ -129,15 +138,15 @@ if 'input_df' in locals():
                         <div style='background-color:{color};padding:20px;border-radius:10px'>
                             <h3 style='color:{font_color}'>✅ Kandidat kemungkinan <u>{prediction_text}</u></h3>
                         </div>
-                        """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
-                    # Tombol simpan ke riwayat
                     if st.button("💾 Simpan ke Riwayat"):
                         st.session_state.history.append({
                             **input_data,
                             "Prediksi": prediction_text
                         })
-                        st.success("Hasil prediksi disimpan ke riwayat.")
+                        save_history_to_file()
+                        st.success("✅ Hasil prediksi disimpan ke riwayat dan file.")
                 else:
                     st.warning("⚠️ Silakan centang validasi sebelum melanjutkan.")
 
@@ -152,13 +161,14 @@ if 'input_df' in locals():
     except Exception as e:
         st.error(f"❌ Terjadi kesalahan saat memproses data: {e}")
 
-# ======================== RIWAYAT ========================
+# ======================== TAMPILKAN RIWAYAT ========================
 if st.session_state.get("show_history", False):
     st.markdown("---")
     st.subheader("🗂️ Riwayat Prediksi Kandidat yang Disimpan")
     if st.session_state.history:
         history_df = pd.DataFrame(st.session_state.history)
         st.dataframe(history_df)
-        st.download_button("📥 Download Riwayat", data=history_df.to_csv(index=False), file_name="riwayat_prediksi.csv", mime="text/csv")
+        st.download_button("📥 Download Riwayat", data=history_df.to_csv(index=False),
+                           file_name="riwayat_prediksi.csv", mime="text/csv")
     else:
         st.info("Belum ada riwayat yang disimpan.")
