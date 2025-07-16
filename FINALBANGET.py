@@ -144,16 +144,15 @@ if mode == "Input Manual":
     input_df = pd.DataFrame([input_data])
 
 # ======================== CSV MODE ========================
-
 else:
     st.subheader("📂 Upload CSV Data Kandidat")
     uploaded_file = st.file_uploader("Pilih file CSV*", type=["csv"], accept_multiple_files=False)
-
+    
     if uploaded_file is not None:
         try:
             # Baca file CSV
             raw_df = pd.read_csv(uploaded_file)
-
+            
             # Standarisasi nama kolom
             column_mapping = {
                 'name': 'CandidateName',
@@ -161,29 +160,24 @@ else:
                 'Nama': 'CandidateName',
                 'nama_kandidat': 'CandidateName',
                 'NamaKandidat': 'CandidateName'
-
             }
             raw_df.rename(columns=column_mapping, inplace=True)
-
-
+            
             # Cek kolom wajib
             required_columns = ['SkillScore', 'InterviewScore', 'PersonalityScore', 'ExperienceYears']
             missing_cols = [col for col in required_columns if col not in raw_df.columns]
-
+            
             if missing_cols:
                 st.error(f"❌ Kolom wajib tidak ditemukan: {', '.join(missing_cols)}")
-
-
                 st.stop()
-
+            
             # Handle kolom nama
             if 'CandidateName' not in raw_df.columns:
                 raw_df['CandidateName'] = [f"Kandidat_{i+1}" for i in range(len(raw_df))]
-
+            
             # Tambahkan timestamp
             raw_df['Timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
+            
             # Handle kolom pendidikan
             for level in ["1", "2", "3", "4"]:
                 if f'EducationLevel_{level}' not in raw_df.columns:
@@ -203,6 +197,10 @@ else:
             
             st.success(f"✅ Berhasil memproses {len(input_df)} kandidat")
             st.dataframe(input_df.head())
+            
+        except Exception as e:
+            st.error(f"❌ Gagal memproses file: {str(e)}")
+            st.stop()
 
 # ======================== PROSES PREDIKSI ========================
 if 'input_df' in locals():
