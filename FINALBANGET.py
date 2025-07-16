@@ -69,9 +69,9 @@ if mode == "Input Manual":
     with st.expander("ℹ️ Penjelasan Setiap Variabel"):
         st.markdown("""
         - **Nama Kandidat**: Nama lengkap kandidat
-        - **Strategi Rekrutmen**: 1=Referensi Karyawan, 2=Sosial Media, 3=Aplikasi Pencari Kerja
+        - **Strategi Rekrutmen**: 1=Referensi Karyawan, 2=Sosial Media, 3=Aplikasi Pencari Kerja
         - **Tingkat Pendidikan**: 1=SMA, 2=D3, 3=S1, 4=S2/S3
-        - **Skor**: Diisi nilai 0–10 untuk Skill, Interview, Personality
+        - **Skor**: Diisi nilai 0-10 untuk Skill, Interview, Personality
         - **Pengalaman**: Tahun pengalaman kerja
         """)
 
@@ -206,6 +206,7 @@ if st.session_state.show_history:
     if st.session_state.history:
         history_df = pd.DataFrame(st.session_state.history)
 
+        # Pastikan kolom TotalScore ada
         if 'TotalScore' not in history_df.columns:
             history_df['TotalScore'] = (
                 history_df.get('SkillScore', 0) +
@@ -215,43 +216,59 @@ if st.session_state.show_history:
             )
 
         st.markdown("### 🎛️ Filter Riwayat")
-        col_filter1, col_filter2 = st.columns([1, 2])
+        col_filter1, col_filter2 = st.columns(2)
 
         with col_filter1:
-            sort_option = st.selectbox("Urutkan berdasarkan", ["Waktu Terbaru", "Paling Layak Diterima"])
-
+            sort_option = st.selectbox("Urutkan berdasarkan", 
+                                     ["Waktu Terbaru", "Total Skor Tertinggi", "Paling Layak (Diterima & Skor Tinggi)"])
+            
         with col_filter2:
-            pred_filter = st.selectbox("Tampilkan", ["Semua", "Hanya yang DITERIMA", "Hanya yang TIDAK DITERIMA"])
+            pred_filter = st.selectbox("Filter Status", 
+                                     ["Semua Kandidat", "Hanya yang DITERIMA", "Hanya yang TIDAK DITERIMA"])
 
+        # Apply status filter
         if pred_filter == "Hanya yang DITERIMA":
             history_df = history_df[history_df['Prediction'] == "DITERIMA"]
         elif pred_filter == "Hanya yang TIDAK DITERIMA":
             history_df = history_df[history_df['Prediction'] == "TIDAK DITERIMA"]
 
-        if sort_option == "Paling Layak Diterima":
-            history_df = history_df.sort_values(by=['Prediction', 'TotalScore'], ascending=[False, False])
-        else:
+        # Apply sorting
+        if sort_option == "Total Skor Tertinggi":
+            history_df = history_df.sort_values(by='TotalScore', ascending=False)
+        elif sort_option == "Paling Layak (Diterima & Skor Tinggi)":
+            # Pertama urutkan berdasarkan Prediction (DITERIMA di atas), lalu TotalScore
+            history_df = history_df.sort_values(by=['Prediction', 'TotalScore'], 
+                                              ascending=[False, False])
+        else:  # Waktu Terbaru
             history_df = history_df.sort_values(by='Timestamp', ascending=False)
 
         history_df = history_df.reset_index(drop=True)
-        history_df.insert(0, 'Ranking', range(1, len(history_df) + 1))
+        history_df.insert(0, 'No', range(1, len(history_df) + 1))
 
-        display_cols = ['Ranking', 'Timestamp', 'CandidateName', 'Prediction', 'SkillScore',
-                        'ExperienceYears', 'InterviewScore', 'PersonalityScore', 'TotalScore']
-        display_cols = [col for col in display_cols if col in history_df.columns]
+        # Tentukan kolom yang akan ditampilkan
+        display_cols = ['No', 'Timestamp', 'CandidateName', 'Prediction', 'TotalScore']
+        if all(col in history_df.columns for col in ['SkillScore', 'InterviewScore', 'PersonalityScore', 'ExperienceYears']):
+            display_cols.extend(['SkillScore', 'InterviewScore', 'PersonalityScore', 'ExperienceYears'])
 
+        # Tampilkan data
         st.dataframe(history_df[display_cols])
 
-        st.download_button(
-            label="📅 Download Riwayat Lengkap",
-            data=history_df.to_csv(index=False),
-            file_name="riwayat_prediksi_lengkap.csv",
-            mime="text/csv"
-        )
+        # Tombol aksi
+        col_download, col_clear = st.columns([3, 1])
+        
+        with col_download:
+            st.download_button(
+                label="📥 Download Riwayat Lengkap",
+                data=history_df.to_csv(index=False),
+                file_name="riwayat_prediksi_lengkap.csv",
+                mime="text/csv"
+            )
+            
+        with col_clear:
+            if st.button("🗑️ Hapus Semua Riwayat", type="primary"):
+                st.session_state.history = []
+                save_history()
+                st.rerun()  # Refresh tampilan
 
-        if st.button("🗑️ Hapus Semua Riwayat"):
-            st.session_state.history = []
-            save_history()
-            st.success("Riwayat telah dihapus")
     else:
         st.info("Belum ada riwayat prediksi yang disimpan.")
