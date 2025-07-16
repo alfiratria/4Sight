@@ -206,7 +206,10 @@ if st.session_state.show_history:
     if st.session_state.history:
         history_df = pd.DataFrame(st.session_state.history)
 
-        # Pastikan kolom TotalScore ada
+        # Pastikan kolom yang diperlukan ada
+        if 'Timestamp' not in history_df.columns:
+            history_df['Timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
         if 'TotalScore' not in history_df.columns:
             history_df['TotalScore'] = (
                 history_df.get('SkillScore', 0) +
@@ -240,13 +243,22 @@ if st.session_state.show_history:
             history_df = history_df.sort_values(by=['Prediction', 'TotalScore'], 
                                               ascending=[False, False])
         else:  # Waktu Terbaru
-            history_df = history_df.sort_values(by='Timestamp', ascending=False)
+            # Pastikan kolom Timestamp ada sebelum sorting
+            if 'Timestamp' in history_df.columns:
+                history_df = history_df.sort_values(by='Timestamp', ascending=False)
+            else:
+                st.warning("Data timestamp tidak tersedia, menggunakan urutan default")
+                history_df = history_df.sort_index(ascending=False)
 
         history_df = history_df.reset_index(drop=True)
         history_df.insert(0, 'No', range(1, len(history_df) + 1))
 
         # Tentukan kolom yang akan ditampilkan
-        display_cols = ['No', 'Timestamp', 'CandidateName', 'Prediction', 'TotalScore']
+        display_cols = ['No']
+        if 'Timestamp' in history_df.columns:
+            display_cols.append('Timestamp')
+        display_cols.extend(['CandidateName', 'Prediction', 'TotalScore'])
+        
         if all(col in history_df.columns for col in ['SkillScore', 'InterviewScore', 'PersonalityScore', 'ExperienceYears']):
             display_cols.extend(['SkillScore', 'InterviewScore', 'PersonalityScore', 'ExperienceYears'])
 
