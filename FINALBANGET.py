@@ -144,64 +144,65 @@ if mode == "Input Manual":
     input_df = pd.DataFrame([input_data])
 
 # ======================== CSV MODE ========================
-else:  # Mode CSV
-    st.subheader("📂 Upload File CSV")
-    uploaded_file = st.file_uploader("Pilih file CSV", type=["csv"])
-    
-    if uploaded_file:
+
+else:
+    st.subheader("📂 Upload CSV Data Kandidat")
+    uploaded_file = st.file_uploader("Pilih file CSV*", type=["csv"], accept_multiple_files=False)
+
+    if uploaded_file is not None:
         try:
             # Baca file CSV
-            df = pd.read_csv(uploaded_file)
-            
+            raw_df = pd.read_csv(uploaded_file)
+
             # Standarisasi nama kolom
             column_mapping = {
-                'namakandidat': 'CandidateName',
-                'nama_kandidat': 'CandidateName',
+                'name': 'CandidateName',
                 'nama': 'CandidateName',
-                'namakandidat': 'CandidateName'
+                'Nama': 'CandidateName',
+                'nama_kandidat': 'CandidateName',
+                'NamaKandidat': 'CandidateName'
+
             }
-            df.columns = df.columns.str.lower()
-            df.rename(columns=column_mapping, inplace=True)
+            raw_df.rename(columns=column_mapping, inplace=True)
+
+
+            # Cek kolom wajib
+            required_columns = ['SkillScore', 'InterviewScore', 'PersonalityScore', 'ExperienceYears']
+            missing_cols = [col for col in required_columns if col not in raw_df.columns]
+
+            if missing_cols:
+                st.error(f"❌ Kolom wajib tidak ditemukan: {', '.join(missing_cols)}")
+
+
+                st.stop()
+
+            # Handle kolom nama
+            if 'CandidateName' not in raw_df.columns:
+                raw_df['CandidateName'] = [f"Kandidat_{i+1}" for i in range(len(raw_df))]
+
+            # Tambahkan timestamp
+            raw_df['Timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+            # Handle kolom pendidikan
+            for level in ["1", "2", "3", "4"]:
+                if f'EducationLevel_{level}' not in raw_df.columns:
+                    raw_df[f'EducationLevel_{level}'] = 0
             
-            # Tambahkan Timestamp jika tidak ada
-            if 'timestamp' not in df.columns:
-                df['Timestamp'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Handle kolom strategi rekrutmen
+            for strategy in ["1", "2", "3"]:
+                if f'RecruitmentStrategy_{strategy}' not in raw_df.columns:
+                    raw_df[f'RecruitmentStrategy_{strategy}'] = 0
             
             # Pastikan semua fitur model ada
-            missing_features = [f for f in feature_names if f not in df.columns]
-            if missing_features:
-                st.error(f"Kolom wajib tidak ditemukan: {', '.join(missing_features)}")
-                st.stop()
+            for col in feature_names:
+                if col not in raw_df.columns and col != 'Timestamp':
+                    raw_df[col] = 0
             
-            # Prediksi
-            input_scaled = scaler.transform(df[feature_names])
-            df['Prediction'] = ["DITERIMA" if p == 1 else "TIDAK DITERIMA" for p in model.predict(input_scaled)]
+            input_df = raw_df[feature_names + ['Timestamp', 'CandidateName']]
             
-            # Hitung total skor
-            score_cols = ['SkillScore', 'InterviewScore', 'PersonalityScore', 'ExperienceYears']
-            df['TotalScore'] = df[score_cols].sum(axis=1)
-            
-            # Tampilkan hasil
-            st.dataframe(df)
-            
-            # Tombol Simpan
-            if st.button("💾 Simpan Semua ke Riwayat"):
-                for _, row in df.iterrows():
-                    st.session_state.history.append({
-                        'CandidateName': row.get('CandidateName', 'Unknown'),
-                        'Timestamp': row['Timestamp'],
-                        'Prediction': row['Prediction'],
-                        'TotalScore': row['TotalScore'],
-                        'SkillScore': row['SkillScore'],
-                        'InterviewScore': row['InterviewScore'],
-                        'PersonalityScore': row['PersonalityScore'],
-                        'ExperienceYears': row['ExperienceYears']
-                    })
-                save_history(st.session_state.history)
-                st.success(f"✅ {len(df)} prediksi disimpan ke riwayat!")
-        
-        except Exception as e:
-            st.error(f"❌ Error saat memproses file: {str(e)}")
+            st.success(f"✅ Berhasil memproses {len(input_df)} kandidat")
+            st.dataframe(input_df.head())
 
 # ======================== PROSES PREDIKSI ========================
 if 'input_df' in locals():
