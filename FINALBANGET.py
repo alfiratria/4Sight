@@ -203,7 +203,6 @@ else:
             st.stop()
 
 # ======================== PROSES PREDIKSI ========================
-if '# ======================== PROSES PREDIKSI ========================
 if 'input_df' in locals():
     st.markdown("---")
     st.subheader("🔍 Hasil Prediksi")
