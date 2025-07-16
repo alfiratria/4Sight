@@ -69,7 +69,7 @@ if mode == "Input Manual":
     with st.expander("ℹ️ Penjelasan Setiap Variabel"):
         st.markdown("""
         - **Nama Kandidat**: Nama lengkap kandidat
-        - **Strategi Rekrutmen**: 1=LinkedIn, 2=Job Fair, 3=Referensi
+        - **Strategi Rekrutmen**: 1=Referensi Karyawan, 2=Sosial Media, 3=Aplikasi Pencari Kerja
         - **Tingkat Pendidikan**: 1=SMA, 2=D3, 3=S1, 4=S2/S3
         - **Skor**: Diisi nilai 0–10 untuk Skill, Interview, Personality
         - **Pengalaman**: Tahun pengalaman kerja
