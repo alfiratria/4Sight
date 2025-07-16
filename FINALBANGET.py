@@ -158,7 +158,8 @@ else:
                 'name': 'CandidateName',
                 'nama': 'CandidateName',
                 'Nama': 'CandidateName',
-                'nama_kandidat': 'CandidateName'
+                'nama_kandidat': 'CandidateName',
+                'NamaKandidat': 'CandidateName'
             }
             raw_df.rename(columns=column_mapping, inplace=True)
             
