@@ -203,106 +203,71 @@ else:
             st.stop()
 
 # ======================== PROSES PREDIKSI ========================
+# ======================== PROSES PREDIKSI ========================
 if 'input_df' in locals():
     st.markdown("---")
     st.subheader("🔍 Hasil Prediksi")
-    
+
     try:
-        # Pastikan urutan kolom sesuai dengan scaler
-        input_df = input_df[scaler.feature_names_in_]
-        input_scaled = pd.DataFrame(scaler.transform(input_df), columns=input_df.columns)
-        
+        # Simpan kolom non-fitur
+        meta_df = input_df[['CandidateName', 'Timestamp']].copy()
+
+        # Scaling hanya kolom fitur
+        X_input = input_df[scaler.feature_names_in_]
+        X_scaled = pd.DataFrame(scaler.transform(X_input), columns=scaler.feature_names_in_)
+
         # Lakukan prediksi
-        predictions = model.predict(input_scaled)
-        
-        # Mode Input Manual
-        if mode == "Input Manual":
-            is_valid = st.checkbox("✅ Saya sudah memverifikasi data di atas benar")
-            
-            if st.button("🚀 Jalankan Prediksi", disabled=not is_valid):
-                result = predictions[0]
-                prediction_text = "DITERIMA" if result == 1 else "TIDAK DITERIMA"
-                color = "#4CAF50" if result == 1 else "#F44336"
-                
-                st.markdown(f"""
-                <div style='background-color:#E8F5E9; padding:15px; border-radius:10px; border-left:5px solid {color}'>
-                    <h3 style='color:{color}; text-align:center'>Hasil Prediksi: <strong>{prediction_text}</strong></h3>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Hitung total skor
-                total_score = (skill_score + interview_score + 
-                              personality_score + experience_years)
-                
-                # Format data untuk riwayat
-                history_record = {
-                    'CandidateName': candidate_name,
-                    'Timestamp': input_data['Timestamp'],
-                    'Prediction': prediction_text,
-                    'TotalScore': total_score,
-                    'SkillScore': skill_score,
-                    'InterviewScore': interview_score,
-                    'PersonalityScore': personality_score,
-                    'ExperienceYears': experience_years,
-                    'EducationLevel': education_level,
-                    'RecruitmentStrategy': recruitment_strategy
-                }
-                
-                # Simpan ke riwayat
-                st.session_state.history.append(history_record)
+        predictions = model.predict(X_scaled)
+
+        # Gabungkan hasil
+        input_df = input_df.copy()
+        input_df['Prediction'] = ["DITERIMA" if p == 1 else "TIDAK DITERIMA" for p in predictions]
+        input_df['TotalScore'] = input_df[['SkillScore', 'InterviewScore',
+                                           'PersonalityScore', 'ExperienceYears']].sum(axis=1)
+        input_df['CandidateName'] = meta_df['CandidateName']
+        input_df['Timestamp'] = meta_df['Timestamp']
+
+        # Urutkan berdasarkan kelayakan
+        input_df = input_df.sort_values(by=['Prediction', 'TotalScore'], ascending=[False, False])
+        input_df.insert(0, 'No', range(1, len(input_df)+1))
+
+        # Tampilkan hasil
+        st.dataframe(input_df.style.applymap(
+            lambda x: 'color: green' if x == "DITERIMA" else 'color: red',
+            subset=['Prediction']
+        ))
+
+        # Tombol aksi
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.download_button(
+                label="📅 Download Hasil Prediksi",
+                data=input_df.to_csv(index=False),
+                file_name="hasil_prediksi.csv",
+                mime="text/csv"
+            )
+
+        with col2:
+            if st.button("💲 Simpan Semua ke Riwayat"):
+                records_to_save = []
+                for _, row in input_df.iterrows():
+                    record = {
+                        'CandidateName': row['CandidateName'],
+                        'Timestamp': row['Timestamp'],
+                        'Prediction': row['Prediction'],
+                        'TotalScore': row['TotalScore'],
+                        'SkillScore': row['SkillScore'],
+                        'InterviewScore': row['InterviewScore'],
+                        'PersonalityScore': row['PersonalityScore'],
+                        'ExperienceYears': row['ExperienceYears']
+                    }
+                    records_to_save.append(record)
+
+                st.session_state.history.extend(records_to_save)
                 save_history(st.session_state.history)
-                st.success("✔️ Hasil prediksi telah disimpan")
-        
-        # Mode CSV
-        else:
-            # Tambahkan hasil prediksi ke DataFrame
-            input_df['Prediction'] = ["DITERIMA" if p == 1 else "TIDAK DITERIMA" for p in predictions]
-            input_df['TotalScore'] = input_df[['SkillScore', 'InterviewScore', 
-                                             'PersonalityScore', 'ExperienceYears']].sum(axis=1)
-            
-            # Urutkan berdasarkan kelayakan
-            input_df = input_df.sort_values(by=['Prediction', 'TotalScore'], 
-                                          ascending=[False, False])
-            input_df.insert(0, 'No', range(1, len(input_df)+1))
-            
-            # Tampilkan hasil
-            st.dataframe(input_df.style.applymap(
-                lambda x: 'color: green' if x == "DITERIMA" else 'color: red',
-                subset=['Prediction']
-            ))
-            
-            # Tombol aksi
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.download_button(
-                    label="📥 Download Hasil Prediksi",
-                    data=input_df.to_csv(index=False),
-                    file_name="hasil_prediksi.csv",
-                    mime="text/csv"
-                )
-            
-            with col2:
-                if st.button("💾 Simpan Semua ke Riwayat"):
-                    # Format data untuk riwayat
-                    records_to_save = []
-                    for _, row in input_df.iterrows():
-                        record = {
-                            'CandidateName': row['CandidateName'],
-                            'Timestamp': row['Timestamp'],
-                            'Prediction': row['Prediction'],
-                            'TotalScore': row['TotalScore'],
-                            'SkillScore': row['SkillScore'],
-                            'InterviewScore': row['InterviewScore'],
-                            'PersonalityScore': row['PersonalityScore'],
-                            'ExperienceYears': row['ExperienceYears']
-                        }
-                        records_to_save.append(record)
-                    
-                    st.session_state.history.extend(records_to_save)
-                    save_history(st.session_state.history)
-                    st.success(f"✔️ {len(records_to_save)} prediksi telah disimpan")
-    
+                st.success(f"✔️ {len(records_to_save)} prediksi telah disimpan")
+
     except Exception as e:
         st.error(f"❌ Terjadi kesalahan saat prediksi: {str(e)}")
 
