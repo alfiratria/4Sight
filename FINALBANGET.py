@@ -273,10 +273,10 @@ if 'input_df' in locals():
             # Urutkan berdasarkan kelayakan
             results_df = results_df.sort_values(by=['Prediction', 'TotalScore'], 
                                               ascending=[False, False])
-            results_df.insert(0, 'No', range(1, len(results_df)+1)
+            results_df.insert(0, 'No', range(1, len(results_df)+1))
             
             # Tampilkan hasil
-            st.dataframe(results_df.style.applymap(
+             st.dataframe(results_df.style.applymap(
                 lambda x: 'color: green' if x == "DITERIMA" else 'color: red',
                 subset=['Prediction']
             ))
