@@ -276,7 +276,7 @@ if 'input_df' in locals():
             results_df.insert(0, 'No', range(1, len(results_df)+1))
             
             # Tampilkan hasil
-             st.dataframe(results_df.style.applymap(
+            st.dataframe(results_df.style.applymap(
                 lambda x: 'color: green' if x == "DITERIMA" else 'color: red',
                 subset=['Prediction']
             ))
